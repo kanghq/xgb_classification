@@ -23,8 +23,8 @@ data = np.loadtxt('/home/ubuntu/train.csv',skiprows=1, delimiter=',',
 sz = data.shape
 
 np.random.shuffle(data)
-train = data[:int(sz[0] * 0.2), :]
-test = data[int(sz[0] * 0.2):, :]
+train = data[:int(sz[0] * 0.9), :]
+test = data[int(sz[0] * 0.9):, :]
 
 train_X = train[:, :93]
 train_Y = train[:, 94]
@@ -49,7 +49,7 @@ param['num_class'] = 9
 watchlist = [(xg_train, 'train'), (xg_test, 'test')]
 num_round = 5
 model = xgb.XGBClassifier(max_depth=6,objectiv='multi:softmax',eta=0.1,silent=0,n_jobs=40,num_class=9)
-#model.fit(train_X,train_Y)
+model.fit(train_X,train_Y)
 
 
 #bst = xgb.train(param, xg_train, num_round, watchlist)
@@ -58,6 +58,10 @@ model = xgb.XGBClassifier(max_depth=6,objectiv='multi:softmax',eta=0.1,silent=0,
 
 #res = model.predict(test_X)
 #pred = model.predict_proba(test_X)
+
+#print(model.booster().get_score(importance_type='weight'))
+#print(model.booster().plot_importance(model))
+
 '''
 for i in range(test_X.shape[0]):
     if res[i] == test_Y[i]:    
@@ -65,64 +69,64 @@ for i in range(test_X.shape[0]):
         print(test_Y[i])
 '''
 #pred_b = label_binarize(pred, classes=range(0,9))
+def plot(test_Yb, pred, param, filename="otto"):
+    fpr = dict()
+    tpr = dict()
 
-fpr = dict()
-tpr = dict()
-
-roc_auc = dict()
+    roc_auc = dict()
 
 
-for i in range(param['num_class']):
-    fpr[i], tpr[i], _ = roc_curve(test_Yb[:, i],pred[:, i])
-    roc_auc[i] = auc(fpr[i], tpr[i])
+    for i in range(param['num_class']):
+        fpr[i], tpr[i], _ = roc_curve(test_Yb[:, i],pred[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
     
-fpr["micro"], tpr["micro"], _ = roc_curve(test_Yb.ravel(), pred.ravel())
-roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+    fpr["micro"], tpr["micro"], _ = roc_curve(test_Yb.ravel(), pred.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 
-n_classes = param["num_class"]
+    n_classes = param["num_class"]
 # Compute macro-average ROC curve and ROC area
 
 # First aggregate all false positive rates
-all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
+    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
 
 # Then interpolate all ROC curves at this points
-mean_tpr = np.zeros_like(all_fpr)
-for i in range(n_classes):
-    mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+    mean_tpr = np.zeros_like(all_fpr)
+    for i in range(n_classes):
+        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
 
 # Finally average it and compute AUC
-mean_tpr /= n_classes
+    mean_tpr /= n_classes
 
-fpr["macro"] = all_fpr
-tpr["macro"] = mean_tpr
-roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+    fpr["macro"] = all_fpr
+    tpr["macro"] = mean_tpr
+    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
 
 # Plot all ROC curves
-plt.figure()
-plt.plot(fpr["micro"], tpr["micro"],
+    plt.figure()
+    plt.plot(fpr["micro"], tpr["micro"],
          label='micro-average ROC curve (area = {0:0.2f})'
                ''.format(roc_auc["micro"]),
          color='deeppink', linestyle=':', linewidth=4)
 
-plt.plot(fpr["macro"], tpr["macro"],
+    plt.plot(fpr["macro"], tpr["macro"],
          label='macro-average ROC curve (area = {0:0.2f})'
                ''.format(roc_auc["macro"]),
          color='navy', linestyle=':', linewidth=4)
 
-colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
-for i, color in zip(range(n_classes), colors):
-    plt.plot(fpr[i], tpr[i], color=color, lw=2,
+    colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(fpr[i], tpr[i], color=color, lw=2,
              label='ROC curve of class {0} (area = {1:0.2f})'
              ''.format(i, roc_auc[i]))
 
-plt.plot([0, 1], [0, 1], 'k--', lw=2)
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('Some extension of Receiver operating characteristic to multi-class')
-plt.legend(loc="lower right")
-plt.savefig("otto.png")
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Some extension of Receiver operating characteristic to multi-class')
+    plt.legend(loc="lower right")
+    plt.savefig(filename)
 
 
 #error_rate = np.sum(res != test_Y) / test_Y.shape[0]
@@ -131,9 +135,17 @@ plt.savefig("otto.png")
 # do the same thing again, but output probabilities
 param['objective'] = 'multi:softprob'
 bst = xgb.train(param, xg_train, num_round, watchlist)
+#print(xgb.get_score())
 # Note: this convention has been changed since xgboost-unity
 # get prediction, this is in 1D array, need reshape to (ndata, nclass)
 pred_prob = bst.predict(xg_test).reshape(test_Y.shape[0], param['num_class'])
 pred_label = np.argmax(pred_prob, axis=1)
+plot(test_Yb, pred_prob, param, "otto")
+print(bst.get_score())
+#print(xgb.plot_importance(bst))
+plt.figure()
+xgb.plot_importance(model,max_num_features=20)
+plt.savefig("imp.png")
+
 #error_rate = np.sum(pred != test_Y) / test_Y.shape[0]
 #print('Test error using softprob = {}'.format(error_rate))
