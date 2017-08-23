@@ -16,20 +16,34 @@ from sklearn.preprocessing import label_binarize
 from sklearn.multiclass import OneVsRestClassifier
 from scipy import interp
 
+def normalize(lst):
+    norm = lst
+    for i in range(lst.shape[0]):
+        norm[i] = [(float(2*j)-max(lst[i])-min(lst[i]))/(max(lst[i])-min(lst[i])) for j in lst[i]]
+        if (i%500 == 0):    
+    	    print(" %.4f done" % (float(i/lst.shape[0])))
+    return norm
+
+
 
 # label need to be 0 to num_class -1
 data = np.loadtxt('/home/ubuntu/train.csv',skiprows=1, delimiter=',',
         converters={0: lambda x:int('0'), 94: lambda x:int(x[6:])-1})
 sz = data.shape
 
+
+
 np.random.shuffle(data)
 train = data[:int(sz[0] * 0.9), :]
 test = data[int(sz[0] * 0.9):, :]
 
 train_X = train[:, :93]
+train_X = normalize(train_X)
 train_Y = train[:, 94]
 
 test_X = test[:, :93]
+test_X = normalize(test_X)
+
 test_Y = test[:, 94]
 test_Yb = label_binarize(test_Y,classes=range(0,9))
 
@@ -56,8 +70,8 @@ model.fit(train_X,train_Y)
 # get prediction
 #pred = bst.predict(xg_test)
 
-#res = model.predict(test_X)
-#pred = model.predict_proba(test_X)
+res = model.predict(test_X)
+pred = model.predict_proba(test_X)
 
 #print(model.booster().get_score(importance_type='weight'))
 #print(model.booster().plot_importance(model))
@@ -129,9 +143,16 @@ def plot(test_Yb, pred, param, filename="otto"):
     plt.savefig(filename)
 
 
-#error_rate = np.sum(res != test_Y) / test_Y.shape[0]
-#print('Test error using softmax = {}'.format(error_rate))
+error_rate = np.sum(res != test_Y) / test_Y.shape[0]
+print('Test error using softmax = {}'.format(error_rate))
 
+plt.figure()
+xgb.plot_importance(model,max_num_features=20)
+
+plt.savefig("imp.png")
+
+
+'''
 # do the same thing again, but output probabilities
 param['objective'] = 'multi:softprob'
 bst = xgb.train(param, xg_train, num_round, watchlist)
@@ -143,9 +164,7 @@ pred_label = np.argmax(pred_prob, axis=1)
 plot(test_Yb, pred_prob, param, "otto")
 print(bst.get_score())
 #print(xgb.plot_importance(bst))
-plt.figure()
-xgb.plot_importance(model,max_num_features=20)
-plt.savefig("imp.png")
 
 #error_rate = np.sum(pred != test_Y) / test_Y.shape[0]
 #print('Test error using softprob = {}'.format(error_rate))
+'''
