@@ -8,6 +8,7 @@ matplotlib.use('Agg')
 import xgboost as xgb
 import matplotlib.pyplot as plt
 from itertools import cycle
+from sklearn.preprocessing import normalize
 
 from sklearn import svm, datasets
 from sklearn.metrics import roc_curve, auc
@@ -16,7 +17,7 @@ from sklearn.preprocessing import label_binarize
 from sklearn.multiclass import OneVsRestClassifier
 from scipy import interp
 
-def normalize(lst):
+def normalizer(lst):
     norm = lst
     for i in range(lst.shape[0]):
         norm[i] = [(float(2*j)-max(lst[i])-min(lst[i]))/(max(lst[i])-min(lst[i])) for j in lst[i]]
@@ -38,11 +39,11 @@ train = data[:int(sz[0] * 0.9), :]
 test = data[int(sz[0] * 0.9):, :]
 
 train_X = train[:, :93]
-train_X = normalize(train_X)
+train_X = normalize(train_X, norm='l1')
 train_Y = train[:, 94]
 
 test_X = test[:, :93]
-test_X = normalize(test_X)
+test_X = normalize(test_X, norm='l1')
 
 test_Y = test[:, 94]
 test_Yb = label_binarize(test_Y,classes=range(0,9))
@@ -152,6 +153,7 @@ xgb.plot_importance(model,max_num_features=20)
 plt.savefig("imp.png")
 
 
+plot(test_Yb, pred, param, "otto")
 '''
 # do the same thing again, but output probabilities
 param['objective'] = 'multi:softprob'
@@ -161,7 +163,6 @@ bst = xgb.train(param, xg_train, num_round, watchlist)
 # get prediction, this is in 1D array, need reshape to (ndata, nclass)
 pred_prob = bst.predict(xg_test).reshape(test_Y.shape[0], param['num_class'])
 pred_label = np.argmax(pred_prob, axis=1)
-plot(test_Yb, pred_prob, param, "otto")
 print(bst.get_score())
 #print(xgb.plot_importance(bst))
 
