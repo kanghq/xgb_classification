@@ -39,11 +39,11 @@ train = data[:int(sz[0] * 0.9), :]
 test = data[int(sz[0] * 0.9):, :]
 
 train_X = train[:, :93]
-train_X = normalize(train_X, norm='l1')
+train_X = normalize(train_X, norm='l2')
 train_Y = train[:, 94]
 
 test_X = test[:, :93]
-test_X = normalize(test_X, norm='l1')
+test_X = normalize(test_X, norm='l2')
 
 test_Y = test[:, 94]
 test_Yb = label_binarize(test_Y,classes=range(0,9))
@@ -63,7 +63,7 @@ param['num_class'] = 9
 
 watchlist = [(xg_train, 'train'), (xg_test, 'test')]
 num_round = 5
-model = xgb.XGBClassifier(max_depth=6,objectiv='multi:softmax',eta=0.1,silent=0,n_jobs=40,num_class=9)
+model = xgb.XGBClassifier(max_depth=10,subsample=0.70,colsample_bytree=0.7,objectiv='multi:softmax',eta=0.05,gammar=5,silent=0,n_jobs=40,num_class=9)
 model.fit(train_X,train_Y)
 
 
