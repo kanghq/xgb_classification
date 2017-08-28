@@ -25,6 +25,12 @@ def normalizer(lst):
     	    print(" %.4f done" % (float(i/lst.shape[0])))
     return norm
 
+def get_subFea(lst,idx):
+    new = np.ones((lst.shape[0],idx.shape[0]))
+    for j in range(lst.shape[0]):
+        new[j] = np.array([lst[j][i] for i in (idx)])
+    return new 
+
 
 
 # label need to be 0 to num_class -1
@@ -39,12 +45,19 @@ train = data[:int(sz[0] * 0.9), :]
 test = data[int(sz[0] * 0.9):, :]
 
 train_X = train[:, :93]
+index = np.array([1,8,9,11,13,14,15,16,17,18,20,22,24,25,26,32,33,34,36,37,38,39,40,41,42,43,44,48,50,53,54,56,57,59,60,62,64,66,67,68,70,71,72,75,76,85,86,87,88,92])
+train_X = get_subFea(train_X,index)
+
 train_X = normalize(train_X, norm='l2')
+         
 train_Y = train[:, 94]
 
-test_X = test[:, :93]
-test_X = normalize(test_X, norm='l2')
 
+test_X = test[:, :93]
+
+test_X = get_subFea(test_X,index)
+
+test_X = normalize(test_X, norm='l2')
 test_Y = test[:, 94]
 test_Yb = label_binarize(test_Y,classes=range(0,9))
 
@@ -148,10 +161,10 @@ error_rate = np.sum(res != test_Y) / test_Y.shape[0]
 print('Test error using softmax = {}'.format(error_rate))
 
 plt.figure()
-xgb.plot_importance(model,max_num_features=20)
+xgb.plot_importance(model,max_num_features=50)
 
 plt.savefig("imp.png")
-
+print(model.feature_importances_)
 
 plot(test_Yb, pred, param, "otto")
 '''
