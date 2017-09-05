@@ -16,6 +16,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import label_binarize
 from sklearn.multiclass import OneVsRestClassifier
 from scipy import interp
+from hyperopt import hp, fmin, tpe, STATUS_OK, Trials
+from sklearn.metrics import roc_auc_score
+
+
 
 def normalizer(lst):
     norm = lst
@@ -41,12 +45,13 @@ sz = data.shape
 
 
 np.random.shuffle(data)
+
 train = data[:int(sz[0] * 0.9), :]
 test = data[int(sz[0] * 0.9):, :]
 
 train_X = train[:, :93]
 index = np.array([1,8,9,11,13,14,15,16,17,18,20,22,24,25,26,32,33,34,36,37,38,39,40,41,42,43,44,48,50,53,54,56,57,59,60,62,64,66,67,68,70,71,72,75,76,85,86,87,88,92])
-train_X = get_subFea(train_X,index)
+#train_X = get_subFea(train_X,index)
 
 train_X = normalize(train_X, norm='l2')
          
@@ -55,7 +60,7 @@ train_Y = train[:, 94]
 
 test_X = test[:, :93]
 
-test_X = get_subFea(test_X,index)
+#test_X = get_subFea(test_X,index)
 
 test_X = normalize(test_X, norm='l2')
 test_Y = test[:, 94]
@@ -76,16 +81,43 @@ param['num_class'] = 9
 
 watchlist = [(xg_train, 'train'), (xg_test, 'test')]
 num_round = 5
-model = xgb.XGBClassifier(max_depth=10,subsample=0.70,colsample_bytree=0.7,objectiv='multi:softmax',eta=0.05,gammar=5,silent=0,n_jobs=40,num_class=9)
-model.fit(train_X,train_Y)
+def objective(space):
+    model = xgb.XGBClassifier(n_estimators = 10000, 
+                            max_depth = int(space['max_depth']),
+                            min_child_weight = space['min_child_weight'],
+                            subsample = space['subsample']
+                            ,colsample_bytree=0.7,objectiv='multi:softmax',eta=0.05,gammar=5,silent=0,n_jobs=40,num_class=9)
+    eval_set = [(train_X, train_Y, (test_X, test_Y))]
+    model.fit(train_X,train_Y, eval_set=eval_set,eval_metric="merror",early_stopping_rounds=30)
+    
 
 
 #bst = xgb.train(param, xg_train, num_round, watchlist)
 # get prediction
 #pred = bst.predict(xg_test)
 
-res = model.predict(test_X)
-pred = model.predict_proba(test_X)
+    res = model.predict(test_X)
+    #pred = model.predict_proba(test_X)
+    #auc = roc_auc_score(test_Yb[:,1], pred[:,1])
+    error_rate = np.sum(res != test_Y) / test_Y.shape[0]
+    print "SCORE:", error_rate
+
+    return{'loss':error_rate, 'status': STATUS_OK }
+space ={
+        'max_depth': hp.quniform("x_max_depth", 5, 30, 1),
+        'min_child_weight': hp.quniform ('x_min_child', 1, 10, 1),
+        'subsample': hp.uniform ('x_subsample', 0.8, 1)
+    }
+
+
+trials = Trials()
+best = fmin(fn=objective,
+            space=space,
+            algo=tpe.suggest,
+            max_evals=100,
+            trials=trials)
+
+print best
 
 #print(model.booster().get_score(importance_type='weight'))
 #print(model.booster().plot_importance(model))
@@ -98,6 +130,31 @@ for i in range(test_X.shape[0]):
 '''
 #pred_b = label_binarize(pred, classes=range(0,9))
 def plot(test_Yb, pred, param, filename="otto"):
+    fpr = dict()
+    tpr = dict()
+
+    roc_auc = dict()
+
+
+    for i in range(param['num_class']):
+        fpr[i], tpr[i], _ = roc_curve(test_Yb[:, i],pred[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+    
+    fpr["micro"], tpr["micro"], _ = roc_curve(test_Yb.ravel(), pred.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+    n_classes = param["num_class"]
+# Compute macro-average ROC curve and ROC area
+
+# First aggregate all false positive rates
+    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
+
+# Then interpolate all ROC curves at this points
+    mean_tpr = np.zeros_like(all_fpr)
+    for i in range(n_classes):
+        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+
+# Finally average it and compute AUC
     fpr = dict()
     tpr = dict()
 
@@ -156,29 +213,3 @@ def plot(test_Yb, pred, param, filename="otto"):
     plt.legend(loc="lower right")
     plt.savefig(filename)
 
-
-error_rate = np.sum(res != test_Y) / test_Y.shape[0]
-print('Test error using softmax = {}'.format(error_rate))
-
-plt.figure()
-xgb.plot_importance(model,max_num_features=50)
-
-plt.savefig("imp.png")
-print(model.feature_importances_)
-
-plot(test_Yb, pred, param, "otto")
-'''
-# do the same thing again, but output probabilities
-param['objective'] = 'multi:softprob'
-bst = xgb.train(param, xg_train, num_round, watchlist)
-#print(xgb.get_score())
-# Note: this convention has been changed since xgboost-unity
-# get prediction, this is in 1D array, need reshape to (ndata, nclass)
-pred_prob = bst.predict(xg_test).reshape(test_Y.shape[0], param['num_class'])
-pred_label = np.argmax(pred_prob, axis=1)
-print(bst.get_score())
-#print(xgb.plot_importance(bst))
-
-#error_rate = np.sum(pred != test_Y) / test_Y.shape[0]
-#print('Test error using softprob = {}'.format(error_rate))
-'''
