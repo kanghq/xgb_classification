@@ -17,6 +17,33 @@ from sklearn.preprocessing import label_binarize
 from sklearn.multiclass import OneVsRestClassifier
 from scipy import interp
 
+def addFea(train_Xn,train_X,num1,num2):
+    train_var = tran(train_X[:, 1:], np.var, axis=1)
+    train_zero = tran(train_X, np.count_nonzero, axis=1)
+    train_zero.shape = 1,-1
+    train_zero = map(lambda x:94-x, train_zero)
+    train_zero = np.transpose(train_zero)
+    train_add = np.add(train_X[:, num1],train_X[:, num2])
+    train_mul = train_X[:, num1]*train_X[:, num2]
+    train_sub = np.subtract(train_X[:, num1], train_X[:, num2])
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        train_div = np.true_divide(train_X[:,25],train_X[:,67])
+        train_div[train_div == np.inf] = 0
+        train_div = np.nan_to_num(train_div)
+
+    train_Xn = np.c_[train_Xn, train_var,train_zero,train_add,train_sub,train_mul,train_div ]
+    return train_Xn
+  
+
+def tran(array, func, *args, **kwargs):
+    res = func(array, *args, **kwargs)
+    res.shape = (res.shape[0],1)
+    np.transpose(res)
+    return res
+
+
+
 def normalizer(lst):
     norm = lst
     for i in range(lst.shape[0]):
@@ -39,10 +66,20 @@ train = data[:int(sz[0] * 0.9), :]
 test = data[int(sz[0] * 0.9):, :]
 
 train_X = train[:, :93]
-train_X = normalize(train_X, norm='l2')
+train_Xo = train_X
+
 train_Y = train[:, 94]
+train_X = addFea(train_X,train_Xo,25,67)
+train_X = addFea(train_X,train_Xo,25,86)
+print train_X[0,:]
+
+train_X = normalize(train_X, norm='l2')
 
 test_X = test[:, :93]
+test_Xo = test_X
+test_X = addFea(test_X,test_X,25,67)
+test_X = addFea(test_X,test_Xo,25,86)
+
 test_X = normalize(test_X, norm='l2')
 
 test_Y = test[:, 94]
